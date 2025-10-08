@@ -120,18 +120,30 @@ class YOLOFaceDetector:
             import torch
             if hasattr(torch, 'serialization'):
                 try:
-                    # Import Ultralytics classes
+                    # Import all Ultralytics modules dynamically
                     from ultralytics.nn.tasks import DetectionModel, SegmentationModel, ClassificationModel
                     from ultralytics.engine.model import Model
+                    from ultralytics.nn import modules as ultralytics_modules
 
-                    # Import PyTorch nn modules
+                    # Import PyTorch nn
                     import torch.nn as nn
 
-                    # Add all necessary classes
-                    safe_classes = [
-                        # Ultralytics
-                        DetectionModel, SegmentationModel, ClassificationModel, Model,
-                        # PyTorch nn modules
+                    # Collect all Ultralytics classes
+                    safe_classes = [DetectionModel, SegmentationModel, ClassificationModel, Model]
+
+                    # Add all classes from ultralytics.nn.modules submodules
+                    for module_name in ['conv', 'block', 'head', 'transformer']:
+                        try:
+                            module = getattr(ultralytics_modules, module_name)
+                            for name in dir(module):
+                                obj = getattr(module, name)
+                                if isinstance(obj, type) and not name.startswith('_'):
+                                    safe_classes.append(obj)
+                        except:
+                            pass
+
+                    # Add PyTorch nn modules
+                    safe_classes.extend([
                         nn.modules.container.Sequential,
                         nn.modules.conv.Conv2d,
                         nn.modules.batchnorm.BatchNorm2d,
@@ -139,10 +151,10 @@ class YOLOFaceDetector:
                         nn.modules.pooling.MaxPool2d,
                         nn.modules.upsampling.Upsample,
                         nn.modules.linear.Linear,
-                    ]
+                    ])
 
                     torch.serialization.add_safe_globals(safe_classes)
-                    logger.debug("Added PyTorch and Ultralytics classes to safe globals")
+                    logger.debug(f"Added {len(safe_classes)} classes to safe globals")
                 except Exception as e:
                     logger.warning(f"Could not add safe globals: {e}")
 
