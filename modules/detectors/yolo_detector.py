@@ -119,14 +119,30 @@ class YOLOFaceDetector:
             # Fix for PyTorch 2.6+ weights_only issue
             import torch
             if hasattr(torch, 'serialization'):
-                # Add YOLO classes to safe globals for PyTorch 2.6+
                 try:
+                    # Import Ultralytics classes
                     from ultralytics.nn.tasks import DetectionModel, SegmentationModel, ClassificationModel
                     from ultralytics.engine.model import Model
 
-                    safe_classes = [DetectionModel, SegmentationModel, ClassificationModel, Model]
+                    # Import PyTorch nn modules
+                    import torch.nn as nn
+
+                    # Add all necessary classes
+                    safe_classes = [
+                        # Ultralytics
+                        DetectionModel, SegmentationModel, ClassificationModel, Model,
+                        # PyTorch nn modules
+                        nn.modules.container.Sequential,
+                        nn.modules.conv.Conv2d,
+                        nn.modules.batchnorm.BatchNorm2d,
+                        nn.modules.activation.SiLU,
+                        nn.modules.pooling.MaxPool2d,
+                        nn.modules.upsampling.Upsample,
+                        nn.modules.linear.Linear,
+                    ]
+
                     torch.serialization.add_safe_globals(safe_classes)
-                    logger.debug("Added Ultralytics classes to PyTorch safe globals")
+                    logger.debug("Added PyTorch and Ultralytics classes to safe globals")
                 except Exception as e:
                     logger.warning(f"Could not add safe globals: {e}")
 
