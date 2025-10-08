@@ -116,12 +116,23 @@ class YOLOFaceDetector:
             RuntimeError: If model cannot be loaded
         """
         try:
-            # If model doesn't exist locally, YOLO will download it
+            # If model doesn't exist locally, download it using just the model name
             if not self.model_path.exists():
                 logger.info(f"Model not found locally. Downloading {config.YOLO_MODEL_NAME}...")
                 config.MODELS_DIR.mkdir(exist_ok=True)
 
-            model = YOLO(str(self.model_path))
+                # Download model using just the name (YOLO handles download)
+                model = YOLO(config.YOLO_MODEL_NAME)
+
+                # Save to our models directory
+                import shutil
+                downloaded_path = Path.home() / '.cache' / 'ultralytics' / config.YOLO_MODEL_NAME
+                if downloaded_path.exists():
+                    shutil.copy(downloaded_path, self.model_path)
+                    logger.info(f"Model saved to: {self.model_path}")
+            else:
+                # Load existing model
+                model = YOLO(str(self.model_path))
 
             # Set device
             model.to(self.device)
@@ -145,6 +156,9 @@ class YOLOFaceDetector:
         """
         Detect faces in an image.
 
+        Note: Uses person detection from YOLO and estimates face location
+        as upper 1/3 of person bounding box.
+
         Args:
             image: Input image as numpy array (BGR format)
             return_crops: If True, include cropped face images in results
@@ -166,7 +180,8 @@ class YOLOFaceDetector:
                 image,
                 conf=self.confidence_threshold,
                 iou=self.iou_threshold,
-                verbose=False
+                verbose=False,
+                classes=[0]  # Class 0 is 'person' in COCO dataset
             )
 
             detections = []
@@ -179,8 +194,29 @@ class YOLOFaceDetector:
                     continue
 
                 for box in boxes:
-                    # Get bounding box coordinates
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
+                    # Get bounding box coordinates for person
+                    px1, py1, px2, py2 = box.xyxy[0].cpu().numpy().astype(int)
+
+                    # Estimate face location (upper 1/3 of person bbox)
+                    person_height = py2 - py1
+                    person_width = px2 - px1
+
+                    # Face is typically in upper 1/3, centered horizontally
+                    face_height = int(person_height * 0.35)  # Upper 35% of body
+                    face_width = int(person_width * 0.8)     # 80% of body width
+
+                    # Calculate face bounding box
+                    x1 = px1 + (person_width - face_width) // 2
+                    y1 = py1
+                    x2 = x1 + face_width
+                    y2 = py1 + face_height
+
+                    # Ensure bounds are within image
+                    img_h, img_w = image.shape[:2]
+                    x1 = max(0, x1)
+                    y1 = max(0, y1)
+                    x2 = min(img_w, x2)
+                    y2 = min(img_h, y2)
 
                     # Filter by minimum size
                     width = x2 - x1
@@ -191,7 +227,7 @@ class YOLOFaceDetector:
 
                     # Get confidence and class
                     confidence = float(box.conf[0])
-                    class_id = int(box.cls[0])
+                    class_id = 0  # We use person class
 
                     # Create detection object
                     face_crop = None
@@ -274,7 +310,8 @@ class YOLOFaceDetector:
                 images,
                 conf=self.confidence_threshold,
                 iou=self.iou_threshold,
-                verbose=False
+                verbose=False,
+                classes=[0]  # Class 0 is 'person'
             )
 
             all_detections = []
@@ -286,7 +323,27 @@ class YOLOFaceDetector:
 
                 if boxes is not None and len(boxes) > 0:
                     for box in boxes:
-                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
+                        # Get person bbox
+                        px1, py1, px2, py2 = box.xyxy[0].cpu().numpy().astype(int)
+
+                        # Estimate face location
+                        person_height = py2 - py1
+                        person_width = px2 - px1
+
+                        face_height = int(person_height * 0.35)
+                        face_width = int(person_width * 0.8)
+
+                        x1 = px1 + (person_width - face_width) // 2
+                        y1 = py1
+                        x2 = x1 + face_width
+                        y2 = py1 + face_height
+
+                        # Ensure bounds
+                        img_h, img_w = images[img_idx].shape[:2]
+                        x1 = max(0, x1)
+                        y1 = max(0, y1)
+                        x2 = min(img_w, x2)
+                        y2 = min(img_h, y2)
 
                         # Filter by minimum size
                         width = x2 - x1
@@ -296,7 +353,7 @@ class YOLOFaceDetector:
                             continue
 
                         confidence = float(box.conf[0])
-                        class_id = int(box.cls[0])
+                        class_id = 0
 
                         face_crop = None
                         if return_crops:
