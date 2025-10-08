@@ -134,8 +134,14 @@ class YOLOFaceDetector:
                 # Load existing model
                 model = YOLO(str(self.model_path))
 
-            # Set device
+            # Set device and optimize for GPU
             model.to(self.device)
+
+            # Log GPU optimization info
+            if self.device == "cuda":
+                logger.info(f"GPU acceleration enabled on {self.device}")
+                if hasattr(config, 'YOLO_USE_HALF_PRECISION') and config.YOLO_USE_HALF_PRECISION:
+                    logger.info("FP16 (half precision) will be used for inference")
 
             logger.info(f"Model loaded successfully: {self.model_path.name}")
             return model
@@ -175,14 +181,24 @@ class YOLOFaceDetector:
             return []
 
         try:
+            # Prepare inference parameters
+            inference_params = {
+                'conf': self.confidence_threshold,
+                'iou': self.iou_threshold,
+                'verbose': False,
+                'classes': [0],  # Class 0 is 'person' in COCO dataset
+                'device': self.device
+            }
+
+            # Add GPU optimizations
+            if self.device == "cuda":
+                if hasattr(config, 'YOLO_IMAGE_SIZE'):
+                    inference_params['imgsz'] = config.YOLO_IMAGE_SIZE
+                if hasattr(config, 'YOLO_USE_HALF_PRECISION') and config.YOLO_USE_HALF_PRECISION:
+                    inference_params['half'] = True
+
             # Run inference
-            results = self.model(
-                image,
-                conf=self.confidence_threshold,
-                iou=self.iou_threshold,
-                verbose=False,
-                classes=[0]  # Class 0 is 'person' in COCO dataset
-            )
+            results = self.model(image, **inference_params)
 
             detections = []
 
