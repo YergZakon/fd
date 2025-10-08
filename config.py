@@ -23,14 +23,14 @@ OUTPUTS_DIR.mkdir(exist_ok=True)
 # ==================== MODEL CONFIGURATION ====================
 
 # YOLOv11 Face Detection - RTX 5090 Laptop Optimized
-YOLO_MODEL_NAME = "yolo11l.pt"  # Large model for RTX 5090 (balanced speed/accuracy)
+YOLO_MODEL_NAME = "yolo11n.pt"  # Nano model for compatibility (temp - will upgrade to yolo11l.pt later)
 YOLO_MODEL_PATH = MODELS_DIR / YOLO_MODEL_NAME
 YOLO_CONFIDENCE_THRESHOLD = 0.5
 YOLO_IOU_THRESHOLD = 0.45
 YOLO_DEVICE = "cuda"  # RTX 5090 GPU acceleration
-YOLO_IMAGE_SIZE = 1280  # High resolution for better accuracy
+YOLO_IMAGE_SIZE = 640  # Standard resolution for nano model
 YOLO_USE_HALF_PRECISION = True  # FP16 for 2x speed boost
-YOLO_BATCH_SIZE = 8  # Conservative for laptop GPU
+YOLO_BATCH_SIZE = 16  # Increased for smaller model
 
 # Traditional FER Model
 FER_MODEL_NAME = "trpakov/vit-face-expression"  # Hugging Face model ID

@@ -116,47 +116,27 @@ class YOLOFaceDetector:
             RuntimeError: If model cannot be loaded
         """
         try:
-            # Fix for PyTorch 2.6+ weights_only issue
             import torch
-            if hasattr(torch, 'serialization'):
-                try:
-                    # Import all Ultralytics modules dynamically
-                    from ultralytics.nn.tasks import DetectionModel, SegmentationModel, ClassificationModel
-                    from ultralytics.engine.model import Model
-                    from ultralytics.nn import modules as ultralytics_modules
 
-                    # Import PyTorch nn
-                    import torch.nn as nn
-
-                    # Collect all Ultralytics classes
-                    safe_classes = [DetectionModel, SegmentationModel, ClassificationModel, Model]
-
-                    # Add all classes from ultralytics.nn.modules submodules
-                    for module_name in ['conv', 'block', 'head', 'transformer']:
-                        try:
-                            module = getattr(ultralytics_modules, module_name)
-                            for name in dir(module):
-                                obj = getattr(module, name)
-                                if isinstance(obj, type) and not name.startswith('_'):
-                                    safe_classes.append(obj)
-                        except:
-                            pass
-
-                    # Add PyTorch nn modules
-                    safe_classes.extend([
-                        nn.modules.container.Sequential,
-                        nn.modules.conv.Conv2d,
-                        nn.modules.batchnorm.BatchNorm2d,
-                        nn.modules.activation.SiLU,
-                        nn.modules.pooling.MaxPool2d,
-                        nn.modules.upsampling.Upsample,
-                        nn.modules.linear.Linear,
-                    ])
-
-                    torch.serialization.add_safe_globals(safe_classes)
-                    logger.debug(f"Added {len(safe_classes)} classes to safe globals")
-                except Exception as e:
-                    logger.warning(f"Could not add safe globals: {e}")
+            # Pre-import all required Ultralytics modules to make them available during unpickling
+            # This ensures that pickle can find all the custom classes when deserializing
+            try:
+                from ultralytics.nn.tasks import DetectionModel, SegmentationModel, ClassificationModel
+                from ultralytics.engine.model import Model
+                from ultralytics.nn.modules import block, conv, head, transformer
+                from ultralytics.nn.modules.block import (
+                    C3k2, C2f, C3, SPPF, C2fAttn, ImagePoolingAttn,
+                    ContrastiveHead, BNContrastiveHead, Proto, RepC3, C3Ghost
+                )
+                from ultralytics.nn.modules.conv import (
+                    Conv, DWConv, ConvTranspose, Focus, GhostConv,
+                    ChannelAttention, SpatialAttention, CBAM, Concat
+                )
+                from ultralytics.nn.modules.head import Detect, Segment, Pose, Classify, OBB
+                import torch.nn as nn
+                logger.info("Pre-imported all Ultralytics modules for unpickling")
+            except Exception as e:
+                logger.warning(f"Could not pre-import some Ultralytics modules: {e}")
 
             # Temporarily patch torch.load to use weights_only=False for trusted YOLO models
             # This is safe because we're loading official Ultralytics models from trusted source
