@@ -15,10 +15,13 @@ import torch
 # Fix for PyTorch 2.6+ weights_only issue with YOLO models
 if hasattr(torch, 'serialization'):
     try:
-        from ultralytics.nn.tasks import DetectionModel
-        torch.serialization.add_safe_globals([DetectionModel])
-    except:
-        pass
+        from ultralytics.nn.tasks import DetectionModel, SegmentationModel, ClassificationModel
+        from ultralytics.engine.model import Model
+
+        safe_classes = [DetectionModel, SegmentationModel, ClassificationModel, Model]
+        torch.serialization.add_safe_globals(safe_classes)
+    except Exception as e:
+        print(f"Warning: Could not add Ultralytics safe globals: {e}")
 
 import config
 from modules.video_processing.frame_extractor import VideoFrameExtractor

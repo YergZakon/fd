@@ -121,10 +121,14 @@ class YOLOFaceDetector:
             if hasattr(torch, 'serialization'):
                 # Add YOLO classes to safe globals for PyTorch 2.6+
                 try:
-                    from ultralytics.nn.tasks import DetectionModel
-                    torch.serialization.add_safe_globals([DetectionModel])
-                except:
-                    pass
+                    from ultralytics.nn.tasks import DetectionModel, SegmentationModel, ClassificationModel
+                    from ultralytics.engine.model import Model
+
+                    safe_classes = [DetectionModel, SegmentationModel, ClassificationModel, Model]
+                    torch.serialization.add_safe_globals(safe_classes)
+                    logger.debug("Added Ultralytics classes to PyTorch safe globals")
+                except Exception as e:
+                    logger.warning(f"Could not add safe globals: {e}")
 
             # If model doesn't exist locally, download it using just the model name
             if not self.model_path.exists():
