@@ -116,6 +116,16 @@ class YOLOFaceDetector:
             RuntimeError: If model cannot be loaded
         """
         try:
+            # Fix for PyTorch 2.6+ weights_only issue
+            import torch
+            if hasattr(torch, 'serialization'):
+                # Add YOLO classes to safe globals for PyTorch 2.6+
+                try:
+                    from ultralytics.nn.tasks import DetectionModel
+                    torch.serialization.add_safe_globals([DetectionModel])
+                except:
+                    pass
+
             # If model doesn't exist locally, download it using just the model name
             if not self.model_path.exists():
                 logger.info(f"Model not found locally. Downloading {config.YOLO_MODEL_NAME}...")

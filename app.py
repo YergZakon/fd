@@ -10,6 +10,15 @@ import numpy as np
 from pathlib import Path
 import tempfile
 import logging
+import torch
+
+# Fix for PyTorch 2.6+ weights_only issue with YOLO models
+if hasattr(torch, 'serialization'):
+    try:
+        from ultralytics.nn.tasks import DetectionModel
+        torch.serialization.add_safe_globals([DetectionModel])
+    except:
+        pass
 
 import config
 from modules.video_processing.frame_extractor import VideoFrameExtractor
