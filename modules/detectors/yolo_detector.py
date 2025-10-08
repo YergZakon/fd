@@ -158,23 +158,40 @@ class YOLOFaceDetector:
                 except Exception as e:
                     logger.warning(f"Could not add safe globals: {e}")
 
-            # If model doesn't exist locally, download it using just the model name
-            if not self.model_path.exists():
-                logger.info(f"Model not found locally. Downloading {config.YOLO_MODEL_NAME}...")
-                config.MODELS_DIR.mkdir(exist_ok=True)
+            # Temporarily patch torch.load to use weights_only=False for trusted YOLO models
+            # This is safe because we're loading official Ultralytics models from trusted source
+            original_torch_load = torch.load
 
-                # Download model using just the name (YOLO handles download)
-                model = YOLO(config.YOLO_MODEL_NAME)
+            def patched_torch_load(*args, **kwargs):
+                kwargs['weights_only'] = False
+                return original_torch_load(*args, **kwargs)
 
-                # Save to our models directory
-                import shutil
-                downloaded_path = Path.home() / '.cache' / 'ultralytics' / config.YOLO_MODEL_NAME
-                if downloaded_path.exists():
-                    shutil.copy(downloaded_path, self.model_path)
-                    logger.info(f"Model saved to: {self.model_path}")
-            else:
-                # Load existing model
-                model = YOLO(str(self.model_path))
+            torch.load = patched_torch_load
+
+            try:
+                # If model doesn't exist locally, download it using just the model name
+                if not self.model_path.exists():
+                    logger.info(f"Model not found locally. Downloading {config.YOLO_MODEL_NAME}...")
+                    config.MODELS_DIR.mkdir(exist_ok=True)
+
+                    # Download model using just the name (YOLO handles download)
+                    model = YOLO(config.YOLO_MODEL_NAME)
+
+                    # Save to our models directory
+                    import shutil
+                    downloaded_path = Path.home() / '.cache' / 'ultralytics' / config.YOLO_MODEL_NAME
+                    if downloaded_path.exists():
+                        shutil.copy(downloaded_path, self.model_path)
+                        logger.info(f"Model saved to: {self.model_path}")
+                else:
+                    # Load existing model
+                    logger.info(f"Loading model from {self.model_path}...")
+                    model = YOLO(str(self.model_path))
+
+                logger.info("Model loaded successfully with weights_only=False (trusted source)")
+            finally:
+                # Restore original torch.load
+                torch.load = original_torch_load
 
             # Set device and optimize for GPU
             model.to(self.device)
